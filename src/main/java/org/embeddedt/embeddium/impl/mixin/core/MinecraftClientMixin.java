@@ -25,7 +25,7 @@ public class MinecraftClientMixin {
     @Final
     private ReloadableResourceManager resourceManager;
     @Unique
-    private final LongArrayFIFOQueue fences = new LongArrayFIFOQueue();
+    private final LongArrayFIFOQueue fences = new LongArrayFIFOQueue(8);
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void postInit(GameConfig args, CallbackInfo ci) {
@@ -44,7 +44,7 @@ public class MinecraftClientMixin {
         ProfilerFiller profiler = Minecraft.getInstance().getProfiler();
         profiler.push("wait_for_gpu");
 
-        while (this.fences.size() > Embeddium.options().advanced.cpuRenderAheadLimit) {
+        outer: while (this.fences.size() > Embeddium.options().advanced.cpuRenderAheadLimit) {
             var fence = this.fences.dequeueLong();
             // We do a ClientWaitSync here instead of a WaitSync to not allow the CPU to get too far ahead of the GPU.
             // This is also needed to make sure that our persistently-mapped staging buffers function correctly, rather
@@ -63,8 +63,29 @@ public class MinecraftClientMixin {
             // Because we are also waiting on the client for the FenceSync to finish, the flush is effectively treated
             // like a Finish command, where we know that once ClientWaitSync returns, it's likely that everything
             // before it has been completed by the GPU.
-            GL32C.glClientWaitSync(fence, GL32C.GL_SYNC_FLUSH_COMMANDS_BIT, Long.MAX_VALUE);
-            GL32C.glDeleteSync(fence);
+
+            // Spin 40 times with a timeout of 1000ns (40ms total) in the ideal case where we're getting >20fps
+            for (int i = 0; i < 40; i++) {
+                var status = GL32C.glClientWaitSync(fence, GL32C.GL_SYNC_FLUSH_COMMANDS_BIT, 1000);
+                if (status == GL32C.GL_ALREADY_SIGNALED || status == GL32C.GL_CONDITION_SATISFIED) {
+                    GL32C.glDeleteSync(fence);
+                    continue outer;
+                } else if (status == GL32C.GL_WAIT_FAILED) {
+                    throw new RuntimeException("Failed to wait on fence object");
+                }
+            }
+
+            // Otherwise force a thread yield. This will hurt performance further, but ideally will also force a synchronization.
+            while (true) {
+                Thread.yield();
+                var status = GL32C.glClientWaitSync(fence, GL32C.GL_SYNC_FLUSH_COMMANDS_BIT, 10_000);
+                if (status == GL32C.GL_ALREADY_SIGNALED || status == GL32C.GL_CONDITION_SATISFIED) {
+                    GL32C.glDeleteSync(fence);
+                    continue outer;
+                } else if (status == GL32C.GL_WAIT_FAILED) {
+                    throw new RuntimeException("Failed to wait on fence object");
+                }
+            }
         }
 
         profiler.pop();

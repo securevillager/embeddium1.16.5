@@ -67,9 +67,6 @@ dependencies {
     // FIXME remove when NG not loading this from NF itself is fixed
     implementation("io.github.llamalad7:mixinextras-neoforge:0.3.5")
 
-    // Mods
-    compatCompileOnly("curse.maven:codechickenlib-242818:${"codechicken_fileid"()}")
-
     compileOnly("org.projectlombok:lombok:1.18.30")
     annotationProcessor("org.projectlombok:lombok:1.18.30")
 }

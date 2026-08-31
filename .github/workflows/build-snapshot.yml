@@ -15,7 +15,7 @@ jobs:
         run: ref="${GITHUB_REF#refs/heads/}" && echo "branch=${ref////-}" >> $GITHUB_OUTPUT
         id: ref
       - name: Checkout sources
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - uses: madhead/read-java-properties@latest
         id: mod_props
         with:

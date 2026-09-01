@@ -30,7 +30,7 @@ jobs:
           distribution: 'temurin'
           java-version: 17
       - name: Initialize caches
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches

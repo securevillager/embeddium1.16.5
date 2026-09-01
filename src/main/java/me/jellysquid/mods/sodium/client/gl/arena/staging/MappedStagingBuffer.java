@@ -97,7 +97,7 @@ public class MappedStagingBuffer implements StagingBuffer {
             commandList.flushMappedRange(this.mappedBuffer.map, this.start, this.pos - this.start);
         }
 
-        int bytes = 0;
+        long bytes = 0L;
 
         for (CopyCommand command : consolidateCopies(this.pendingCopies)) {
             bytes += command.bytes;
